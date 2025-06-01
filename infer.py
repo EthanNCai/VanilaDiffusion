@@ -17,7 +17,7 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     # Initialize model
-    model = SimpleDiT(img_size=(64, 64), image_channels=1).to(device)
+    model = SimpleDiT(img_size=(64, 64), image_channels=1, patch_size=2).to(device)
     model.load_state_dict(torch.load(args.ckpt, map_location=device))
     model.eval()  # Set model to evaluation mode
     noise_scheduler = NoiseScheduler(device=device)

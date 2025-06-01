@@ -11,7 +11,8 @@ __pycache__/
 
 # 忽略 Jupyter Notebook 的检查点
 .ipynb_checkpoints/
-
+PetImages/
+*.jpg
 # 忽略 VSCode 设置
 .vscode/
 

@@ -27,14 +27,30 @@ class NoiseScheduler():
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - self.alphas_cumprod).to(device)
         self.timesteps = timesteps
         
-    def denoise_image(self, xt, t, pred_noise):
-        alpha_ = self.alphas[t]
-        beta_ = 1 - alpha_
-        alphas_cumprod_ = self.alphas_cumprod[t]
-        one_minus_alphas_cumprod_ = 1 - alphas_cumprod_
+    def sample_prev_image_distribution(self, x_t, t, pred_noise):
+        if isinstance(t, int):
+            t = torch.tensor([t], device=x_t.device)
+        
+        # 支持 batch 的 t（确保是长整型）
+        if t.dim() == 0:
+            t = t[None]
+        
+        alpha_t = self.alphas[t].view(-1, 1, 1, 1)              # α_t
+        beta_t = (1.0 - alpha_t)                                # β_t
+        alpha_bar_t = self.alphas_cumprod[t].view(-1, 1, 1, 1)  # ȧ_t = ∏ α_t
         eps = 1e-8
-        xt_1 = (1 / torch.sqrt(alpha_ + eps)) * (xt - ((beta_) / (torch.sqrt(one_minus_alphas_cumprod_ + eps))) * pred_noise)
-        return xt_1
+
+        # 去噪部分：预测 x_{t-1} 的均值 μ
+        x_mean = (1. / torch.sqrt(alpha_t + eps)) * (
+            x_t - ((beta_t / torch.sqrt(1 - alpha_bar_t + eps)) * pred_noise)
+        )
+
+        # 加采样噪声（除非 t==0，不再加）
+        noise = torch.randn_like(x_t)
+        nonzero_mask = (t != 0).float().view(-1, 1, 1, 1)  # batch 中哪些是 t>0
+        x_prev = x_mean + nonzero_mask * torch.sqrt(beta_t) * noise
+
+        return x_prev
 
     def noise_image(self, x0, t):
         # x0 is images with shape [B, C, H, W]

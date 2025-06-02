@@ -42,6 +42,8 @@ def train(model, train_loader, noise_scheduler, num_epochs=50, device="cuda" if 
         progress_bar = tqdm(enumerate(train_loader), total=len(train_loader), desc=f"Epoch {epoch+1}/{num_epochs}")
         
         for i, (images, label) in progress_bar:
+            # 对于猫狗数据集来说这里需要变一下label，猫 -1 狗 1 uncon 0
+            label = label.float() * 2 - 1
             label = label.unsqueeze(1).float().to(device)
             images = images.to(device)
             optimizer.zero_grad()
@@ -58,8 +60,15 @@ def train(model, train_loader, noise_scheduler, num_epochs=50, device="cuda" if 
         avg_loss = total_loss / len(train_loader)
         print(f"✅ Epoch {epoch+1}/{num_epochs} completed | Average Loss: {avg_loss:.6f}")
         
-        torch.save(model.state_dict(), f"output/diffusion_dit_2_model_epoch_{epoch+1}.pt")
-    
+        # Save model
+        import os
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        folder_path = os.path.join("output", date_str)
+        os.makedirs(folder_path, exist_ok=True)
+        save_path = os.path.join(folder_path, f"diffusion_dit_xatt_model_epoch_{epoch+1}.pt")
+        torch.save(model.state_dict(), save_path)
+            
     return model
 
 

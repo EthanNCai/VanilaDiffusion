@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 from model_dit_cfg_xattention import SimpleDiTConditional
 from noise_scheduler import NoiseScheduler
-
+from PIL import Image  # 新增导入
 def parse_args():
     parser = argparse.ArgumentParser(description='Generate images using a trained diffusion model with Classifier-Free Guidance')
     parser.add_argument('--ckpt', type=str, required=True, help='Path to the checkpoint file')
@@ -28,7 +28,7 @@ def infer_cfg(model, noise_scheduler: NoiseScheduler, x_t, condition, guidance_s
         t_tensor = torch.full((batch_size,), t, device=device, dtype=torch.int)
 
         # 分别推理一次有条件和无条件
-        pred_noise_uncond = model(x_t, t_tensor, uncond_condition)
+        pred_noise_uncond = model(x_t, t_tensor, uncond_condition, force_drop_condition=True)
         pred_noise_cond = model(x_t, t_tensor, condition)
 
         # CFG 融合
@@ -44,28 +44,33 @@ def main():
     args = parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    # condition = 
+
     # 初始化模型和噪声调度器
-    model = SimpleDiTConditional(img_size=(64, 64), image_channels=3, patch_size=2).to(device)
+    model = SimpleDiTConditional(img_size=(32, 32), image_channels=1, patch_size=4,condition_dim=10).to(device)
     model.load_state_dict(torch.load(args.ckpt, map_location=device))
     model.eval()
     noise_scheduler = NoiseScheduler(device=device)
 
     # 生成初始噪声图像
-    x_t = torch.randn((1, 3, 64, 64), device=device)
-    condition = torch.full((1, 1), 1, device=device).float()
+    x_t = torch.randn((1, 1, 32, 32), device=device)
+
+    # 生成一个全是-1的条件向量
+    condition_1 = torch.tensor((1,0,0,0,0,0,0,0,0,0),device=device).float().unsqueeze(0)
+
     # 进行带CFG的推理
     with torch.no_grad():
-        output = infer_cfg(model, noise_scheduler, x_t, condition, args.guidance_scale)
+        output = infer_cfg(model, noise_scheduler, x_t, condition_1, args.guidance_scale)
 
-    # 归一化并保存图片
-    img = output[0, 0].cpu().numpy()
-    img = (img - img.min()) / (img.max() - img.min())
+    img_array = output.cpu().detach().numpy()
+    img = img_array[0, 0]  # (64, 64)
 
-    plt.figure(figsize=(6,6))
+    img = (img - img.min()) / (img.max() - img.min() + 1e-8)
+    plt.figure(figsize=(6, 6))
     plt.imshow(img, cmap='gray')
     plt.axis('off')
     plt.savefig(args.output, bbox_inches='tight', pad_inches=0)
-    print(f"Image saved to {args.output}")
+
 
 if __name__ == "__main__":
     main()

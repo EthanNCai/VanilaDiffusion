@@ -28,12 +28,12 @@ def train(rank, world_size, epochs):
         transforms.ToTensor(),
         transforms.Normalize([0.5]*3, [0.5]*3)
     ])
-
+    
     dataset = CatDogDataset("./PetImages", transform=transform)
     sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
     dataloader = DataLoader(dataset, batch_size=8, sampler=sampler)
 
-    model = SimpleDiTConditional(img_size=(64, 64), image_channels=3, patch_size=2).to(device)
+    model = SimpleDiTConditional(img_size=(64, 64), image_channels=3, patch_size=2,condition_dim=2).to(device)
     model = DDP(model, device_ids=[rank])
 
     noise_scheduler = NoiseScheduler(device=device)
@@ -47,8 +47,7 @@ def train(rank, world_size, epochs):
         progress_bar = tqdm(dataloader, desc=f"[GPU {rank}] Epoch {epoch+1}/{epochs}", disable=(rank != 0))
 
         for images, labels in progress_bar:
-            labels = labels.to(device).float() * 2 - 1
-            labels = labels.unsqueeze(1)
+            labels = torch.nn.functional.one_hot(labels, num_classes=2).float().to(device)
             images = images.to(device)
 
             optimizer.zero_grad()
@@ -65,11 +64,11 @@ def train(rank, world_size, epochs):
 
         if rank == 0:
             avg_loss = total_loss / len(dataloader)
-            print(f"\n✅ Epoch {epoch+1} completed | Avg Loss: {avg_loss:.6f}")
+            print(f"\n Epoch {epoch+1} completed | Avg Loss: {avg_loss:.6f}")
             date_str = datetime.now().strftime("%Y-%m-%d")
             folder_path = os.path.join("output", date_str)
             os.makedirs(folder_path, exist_ok=True)
-            save_path = os.path.join(folder_path, f"diffusion_dit_xatt_model_epoch_{epoch+1}.pt")
+            save_path = os.path.join(folder_path, f"diffusion_dit_xatt_model_cat_and_dog_epoch_{epoch+1}.pt")
             torch.save(model.module.state_dict(), save_path)
 
     cleanup()

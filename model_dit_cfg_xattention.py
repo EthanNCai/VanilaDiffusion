@@ -147,7 +147,7 @@ class SimpleDiTConditional(nn.Module):
         
         # Transformer blocks
         self.blocks = nn.ModuleList([
-            TransformerBlock(embed_dim, heads, embed_dim // heads, mlp_ratio,condition_dim)
+            TransformerBlock(embed_dim, heads, embed_dim // heads, mlp_ratio, 0.1, condition_dim)
             for _ in range(depth)
         ])
         
@@ -225,7 +225,7 @@ if __name__ == "__main__":
     print(f"Timestep shape: {timestep.shape}")
     
     # Forward pass
-    output = model(x, c, timestep, )
+    output = model(x, timestep, c)
     
     print(f"Output shape: {output.shape}")
     

@@ -24,7 +24,7 @@ def train(rank, world_size, epochs):
     device = torch.device(f"cuda:{rank}")
 
     transform = transforms.Compose([
-        transforms.Resize((64, 64)),
+        transforms.Resize((128, 128)),
         transforms.ToTensor(),
         transforms.Normalize([0.5]*3, [0.5]*3)
     ])
@@ -33,7 +33,7 @@ def train(rank, world_size, epochs):
     sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
     dataloader = DataLoader(dataset, batch_size=8, sampler=sampler)
 
-    model = SimpleDiTConditional(img_size=(64, 64), image_channels=3, patch_size=2,condition_dim=2).to(device)
+    model = SimpleDiTConditional(img_size=(128, 128), image_channels=3, patch_size=4,condition_dim=2).to(device)
     model = DDP(model, device_ids=[rank])
 
     noise_scheduler = NoiseScheduler(device=device)

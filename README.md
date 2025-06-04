@@ -65,15 +65,16 @@ def noise_image(self, x0, t):
 
 ```
 这段代码对应的公式是：
-给定干净图像 $x_0$ 和时间步 $t$，我们通过下式得到加噪图像 $x_t$：
+给定干净图像 $ x_0 $ 和时间步 $ t $，我们通过下式得到加噪图像 $ x_t $：
 
-![formula](https://latex.codecogs.com/svg.image?\dpi{150}x_t%20=%20\sqrt{\bar{\alpha}_t}%20\cdot%20x_0%20+%20\sqrt{1%20-%20\bar{\alpha}_t}%20\cdot%20\epsilon,%20\quad%20\epsilon%20\sim%20\mathcal{N}(0,%20I))
-
+$$
+x_t = \sqrt{\bar{\alpha}_t} \cdot x_0 + \sqrt{1 - \bar{\alpha}_t} \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)
+$$
 
 其中：
 
-- $\bar{\alpha}_t=\prod_{s=1}^{t}\alpha_s$，是到当前时间步的累计保留率（噪声扩散控制系数）
-- $\epsilon$ 是标准正态分布的高斯噪声
+- $ \bar{\alpha}_t = \prod_{s=1}^{t} \alpha_s $，是到当前时间步的累计保留率（噪声扩散控制系数）
+- $ \epsilon $ 是标准正态分布的高斯噪声
 
 #### 对于后向过程
 
@@ -85,18 +86,20 @@ def sample_prev_image_distribution(self, x_t, t, pred_noise):
 ```
 这个过程对应前向过程采样公式
 
-我们要从条件分布 $p_\theta(x_{t-1}x_t)$ 中采样：
+我们要从条件分布 $ p_\theta(x_{t-1} \mid x_t) $ 中采样：
 
-![formula](https://latex.codecogs.com/svg.image?\dpi{150}x_{t-1}%20=%20\frac{1}{\sqrt{\alpha_t}}%20\left(%20x_t%20-%20\frac{1%20-%20\alpha_t}{\sqrt{1%20-%20\bar{\alpha}_t}}%20\cdot%20\epsilon_\theta(x_t,%20t)%20\right)%20+%20\sigma_t%20\cdot%20z)
-
+$$
+x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}} \cdot \epsilon_\theta(x_t, t) \right) + \sigma_t \cdot z
+$$
 
 其中：
 
-- $\alpha_t = 1 - \beta_t$
-- $\epsilon_\theta(x_t, t)$ 是预测的噪声
-- $z \sim \mathcal{N}(0, I)$，是标准正态分布噪声
-- $\sigma_t = \sqrt{\beta_t}$，是采样时添加的噪声系数
-- 若 $t = 0$，则不添加噪声项：$z = 0$
+- $ \alpha_t = 1 - \beta_t $
+- $ \bar{\alpha}_t = \prod_{s=1}^{t} \alpha_s $，即累计保留率
+- $ \epsilon_\theta(x_t, t) $ 是预测的噪声
+- $ z \sim \mathcal{N}(0, I) $，是标准正态分布噪声
+- $ \sigma_t = \sqrt{\beta_t} $，是采样时添加的噪声系数
+- 若 $ t = 0 $，则不添加噪声项：$ z = 0 $
 
 
 ### CFG(Classifier free)训练和推理
@@ -133,9 +136,9 @@ __细节来说：__ 在每一个 Transformer Block 中，DiT 执行如下 Cross-
 
 设：
 
-- $\mathbf{z} \in \mathbb{R}^{N \times d}$：图像的隐藏变量（Query）
-- $\mathbf{c} \in \mathbb{R}^{M \times d}$：条件信息（Key 和 Value）
-- $W_Q, W_K, W_V \in \mathbb{R}^{d \times d}$：投影矩阵
+- $ \mathbf{z} \in \mathbb{R}^{N \times d} $：图像的隐藏变量（Query）
+- $ \mathbf{c} \in \mathbb{R}^{M \times d} $：条件信息（Key 和 Value）
+- $ W_Q, W_K, W_V \in \mathbb{R}^{d \times d} $：投影矩阵
 
 则：
 
@@ -143,8 +146,6 @@ $$
 Q = \mathbf{z} W_Q \\
 K = \mathbf{c} W_K \\
 V = \mathbf{c} W_V \\
-$$
-$$
 \text{Attention}(\mathbf{z}, \mathbf{c}) = \text{softmax} \left( \frac{Q K^\top}{\sqrt{d}} \right) V
 $$
 
@@ -156,5 +157,5 @@ $$
 
 其中：
 
-- $\text{softmax} \left( \frac{Q K^\top}{\sqrt{d}} \right)$：计算 Query 与 Key 的相似度
+- $ \text{softmax} \left( \frac{Q K^\top}{\sqrt{d}} \right) $：计算 Query 与 Key 的相似度
 - Residual 连接保证模型训练稳定

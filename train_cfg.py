@@ -124,16 +124,11 @@ def train(args):
         print(f"Epoch {epoch+1}/{args.epochs} | Train Loss: {avg_train_loss:.6f}")
         
         # Save model at specified frequency
-        if (epoch + 1) % args.save_freq == 0:
+        if (epoch + 1) % args.save_freq == 0 or (epoch + 1) == args.epochs:
             model_filename = f"dit_xatt_epoch_{epoch+1}.pt"
             checkpoint_path = os.path.join(save_path, model_filename)
             torch.save(model.state_dict(), checkpoint_path)
             print(f"✓ Checkpoint saved to {checkpoint_path}")
-    
-    # Save final model
-    final_model_path = os.path.join(save_path, "diffusion_dit_xatt_mnist_model_final.pt")
-    torch.save(model.state_dict(), final_model_path)
-    print(f"✓ Training complete! Final model saved to {final_model_path}")
     
     return model
 

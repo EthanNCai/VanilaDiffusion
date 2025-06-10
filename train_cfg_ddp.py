@@ -131,7 +131,7 @@ def train_process(rank, world_size, args):
         
         # Print epoch summary and save model (only on rank 0)
         if rank == 0:
-            print(f"\n✅ Epoch {epoch+1}/{args.epochs} | Average Loss: {avg_loss:.6f}")
+            print(f"\nEpoch {epoch+1}/{args.epochs} | Average Loss: {avg_loss:.6f}")
             
             # Save model checkpoint
             if (epoch + 1) % args.save_freq == 0 or (epoch + 1) == args.epochs:

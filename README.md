@@ -1,4 +1,4 @@
-# VanillaDiffusion
+# SimplestDiffusion
 
 这个仓库包含了Diffusion的代码实现，使用MINST数据集作为演示数据集
 
@@ -23,22 +23,69 @@ pip install -r requirements.txt
 ### 训练
 
 ```
+python train.py
+```
 
+可以调整的参数有
+
+```
+options:
+  -h, --help            show this help message and exit
+  --img_size IMG_SIZE   Image size (default: 64)
+  --channels CHANNELS   Number of image channels (default: 1)
+  --patch_size PATCH_SIZE
+                        Patch size for DiT (default: 2)
+  --epochs EPOCHS       Number of training epochs
+  --batch_size BATCH_SIZE
+                        Training batch size
+  --lr LR               Learning rate
+  --seed SEED           Random seed for reproducibility
+  --save_dir SAVE_DIR   Directory to save model checkpoints
+  --save_freq SAVE_FREQ
+                        Save model every N epochs
 ```
 
 ### 推理
 
 ```
+python infer.py --ckpt /path/to/your/ckpt.pt --output /path/to/your/output.jpg
 ```
-
 
 ## B-使用CrossAttention注入条件的有条件DiT噪声预测模型 (推理使用Classifier free guidance)
 
  
 ### 训练
 
+单卡训练
+```
+python train_cfg.py
+```
 
+多卡训练
+```
+torchrun --nproc_per_node=1 --master_port=12355 train_cfg_ddp.py
+```
 
+可调整的参数有
+```
+options:
+  -h, --help            show this help message and exit
+  --epochs EPOCHS       Number of training epochs
+  --batch_size BATCH_SIZE
+                        Training batch size
+  --lr LR               Learning rate
+  --img_size IMG_SIZE   Image size (default: 32)
+  --patch_size PATCH_SIZE
+                        Patch size for ViT (default: 4)
+  --save_dir SAVE_DIR   Directory to save model checkpoints
+  --seed SEED           Random seed for reproducibility
+  --save_freq SAVE_FREQ
+                        Save model every N epochs
+  --lr_decay_step LR_DECAY_STEP
+                        LR decay step size
+  --lr_decay_rate LR_DECAY_RATE
+                        LR decay rate
+```
 
 ### 推理
 
@@ -54,53 +101,44 @@ python infer_cfg.py --ckpt /path/to/your/ckpt.pt --output /path/to/your/output.j
 
 噪声调度器主要实现两个函数，对应着扩散中的前向和后向过程。
 
-
 #### 对于前向过程
 
 ```python
-# 传入 x0 和 前向时间步序号 t， 得到x0 在 t时刻的加噪图
+'''
+设
+原图（也可以说是：t=0时刻的加噪图）= x0
+t时刻的加噪图 = xt
+前向时间步序号 = t 
+
+这里我们实现的函数就可以表示为:
+xt = f(x0, t）
+即下面的这个函数
+'''
 def noise_image(self, x0, t):
     ...
     return xt, noise
 
 ```
-这段代码对应的公式是：
-给定干净图像 $ x_0 $ 和时间步 $ t $，我们通过下式得到加噪图像 $ x_t $：
 
-$$
-x_t = \sqrt{\bar{\alpha}_t} \cdot x_0 + \sqrt{1 - \bar{\alpha}_t} \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)
-$$
-
-其中：
-
-- $ \bar{\alpha}_t = \prod_{s=1}^{t} \alpha_s $，是到当前时间步的累计保留率（噪声扩散控制系数）
-- $ \epsilon $ 是标准正态分布的高斯噪声
 
 #### 对于后向过程
 
 ```python
-# 传入 xt 和 前向时间步序号 t，以及预测的这一步添加的噪声。得到由xt降噪而来的xt-1的噪声图
+'''
+设
+t时刻的加噪图 = xt 
+t-1时刻的加噪图 = x_{t-1}
+前向时间步序号 = t 
+预测的t时间步加入的噪声 = e，
+
+这里我们实现的函数就可以表示为:
+x_{t-1} = f(xt, t, e）
+即下面的这个函数
+'''
 def sample_prev_image_distribution(self, x_t, t, pred_noise):
     ...
     return x_t-1
 ```
-这个过程对应前向过程采样公式
-
-我们要从条件分布 $ p_\theta(x_{t-1} \mid x_t) $ 中采样：
-
-$$
-x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}} \cdot \epsilon_\theta(x_t, t) \right) + \sigma_t \cdot z
-$$
-
-其中：
-
-- $ \alpha_t = 1 - \beta_t $
-- $ \bar{\alpha}_t = \prod_{s=1}^{t} \alpha_s $，即累计保留率
-- $ \epsilon_\theta(x_t, t) $ 是预测的噪声
-- $ z \sim \mathcal{N}(0, I) $，是标准正态分布噪声
-- $ \sigma_t = \sqrt{\beta_t} $，是采样时添加的噪声系数
-- 若 $ t = 0 $，则不添加噪声项：$ z = 0 $
-
 
 ### CFG(Classifier free)训练和推理
 
@@ -130,32 +168,9 @@ pred_noise = pred_noise_uncond + guidance_scale * (pred_noise_cond - pred_noise_
 ```
 ## Cross Attention是怎么把条件c融合进扩散的？
 
-__简单来说：__ 在DiT的每一个Transfromer block里面，我们都用此时的隐变量 $dim$ 作为 $Query$， 然后 $c$ 作为 $Key$ 和 $Value$， 这样做一个Cross-Attention，就能把 $c$ 注入隐变量。
+假设我们有一个隐tensor h，Shape 为 (B, N1, dim)
+然后我们有一个条件tensor c, Shape为 (B, N2, dim)
+我们可以用h来做为query，c作为key 和 value
+那么最终将会输出一个形状为(B,N1,dim)的tensor hc，
 
-__细节来说：__ 在每一个 Transformer Block 中，DiT 执行如下 Cross-Attention 操作：
-
-设：
-
-- $ \mathbf{z} \in \mathbb{R}^{N \times d} $：图像的隐藏变量（Query）
-- $ \mathbf{c} \in \mathbb{R}^{M \times d} $：条件信息（Key 和 Value）
-- $ W_Q, W_K, W_V \in \mathbb{R}^{d \times d} $：投影矩阵
-
-则：
-
-$$
-Q = \mathbf{z} W_Q \\
-K = \mathbf{c} W_K \\
-V = \mathbf{c} W_V \\
-\text{Attention}(\mathbf{z}, \mathbf{c}) = \text{softmax} \left( \frac{Q K^\top}{\sqrt{d}} \right) V
-$$
-
-最终的输出是（下面这一步是残差连接）：
-
-$$
-\mathbf{z}' = \mathbf{z} + \text{Attention}(\mathbf{z}, \mathbf{c})
-$$
-
-其中：
-
-- $ \text{softmax} \left( \frac{Q K^\top}{\sqrt{d}} \right) $：计算 Query 与 Key 的相似度
-- Residual 连接保证模型训练稳定
+经过注意力计算后，h中的每个query向量会基于c中的key和value计算加权平均，可以看作，h已经被c注入了一些（条件）信息。

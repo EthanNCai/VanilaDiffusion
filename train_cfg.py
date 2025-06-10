@@ -121,7 +121,7 @@ def train(args):
         scheduler.step()
         
         # Print epoch summary
-        print(f"Epoch {epoch+1}/{args.epochs} | Train Loss: {avg_train_loss:.6f}")
+        print(f"Epoch {epoch+1}/{args.epochs} | Average Loss: {avg_train_loss:.6f}")
         
         # Save model at specified frequency
         if (epoch + 1) % args.save_freq == 0 or (epoch + 1) == args.epochs:

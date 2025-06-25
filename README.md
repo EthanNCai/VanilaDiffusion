@@ -4,9 +4,12 @@
 
 实现的内容有：
 
-* 一个Diffusion噪声调度器
-* A- __最基本的无条件DiT噪声预测模型__
-* B- __使用CrossAttention注入条件的有条件DiT噪声预测模型 (推理使用Classifier free guidance)__
+* DDPM-无条件的训练和推理代码
+* DDPM-有条件的训练和推理代码
+* rectified flow matching-训练代码
+* rectified flow matching-ODE推理代码
+* rectified flow matching-SDE推理代码
+
 
 ## 环境安装
 
@@ -18,8 +21,10 @@ pip install -r requirements.txt
 
 数据集方面不需要特别注意，这是个很小的数据集，在运行代码之后会自动下载。
 
-## A-最基本的无条件DiT噪声预测模型
- 
+## DDPM-无条件生成
+
+请首先cd到DDPM目录里
+
 ### 训练
 
 ```
@@ -51,19 +56,15 @@ options:
 python infer.py --ckpt /path/to/your/ckpt.pt --output /path/to/your/output.jpg
 ```
 
-## B-使用CrossAttention注入条件的有条件DiT噪声预测模型 (推理使用Classifier free guidance)
+## DDPM-有条件生成
+原理：CFG训练和采样+cross attention注入条件
 
+请首先cd到DDPM目录里
  
 ### 训练
 
-单卡训练
 ```
 python train_cfg.py
-```
-
-多卡训练
-```
-torchrun --nproc_per_node=1 --master_port=12355 train_cfg_ddp.py
 ```
 
 可调整的参数有
@@ -95,7 +96,22 @@ options:
 python infer_cfg.py --ckpt /path/to/your/ckpt.pt --output /path/to/your/output.jpg --label 4
 ```
 
-## 额外的笔记
+
+## Flowmatching 训练
+
+to do .....
+
+## Flow Matching ODE 推理
+
+to do .....
+
+## Flow Matching SDE 推理
+
+to do .....
+
+
+
+# 其他乱七八糟的笔记
 
 ### 噪声调度器
 
@@ -140,7 +156,7 @@ def sample_prev_image_distribution(self, x_t, t, pred_noise):
     return x_t-1
 ```
 
-### CFG(Classifier free)训练和推理
+### CFG(Classifier free)训练和推理的细节
 
 #### cfg的训练
 
@@ -174,3 +190,51 @@ pred_noise = pred_noise_uncond + guidance_scale * (pred_noise_cond - pred_noise_
 那么最终将会输出一个形状为(B,N1,dim)的tensor hc，
 
 经过注意力计算后，h中的每个query向量会基于c中的key和value计算加权平均，可以看作，h已经被c注入了一些（条件）信息。
+
+## Flowmatching 笔记
+
+
+[这是一个好笔记](https://zhuanlan.zhihu.com/p/16113190076)
+
+[这是一个好可视化笔记](https://zhuanlan.zhihu.com/p/677154173)
+
+
+### Flow matching 训练
+
+Flowmatching的美德在于
+
+* 全部都是确定的东西！！因此没有任何概率建模（例如分布）
+* 比DDPM简洁100倍
+
+
+x是图片，x可以在空间里面移动，假设t时移动的位置是 $x(t)$
+
+并且我们还知道 x(t) 其实是在 x_0 即原图 和 x_1 即完全噪声 之间的一个值（甚至可以看作加权平均）所以可以得到下面这个式子
+
+$$ x(t) = t \times x_1  + (1-t) \times x_0 $$
+
+对其求导就得到了一个超简单的常微分方程
+
+$$
+\frac{dx(t)}{dt} = x_1 - x_0
+$$
+
+而我们的模型预测的目标就是它，也就是$\frac{dx(t)}{dt}$
+
+所以假设 x_0 到 x_1 是一个线性的过程的话，那么每一步的变化率恒定为 $x_1 - x_0$ 这太棒了，因为每一步的ground truth都是恒定的。
+
+所以loss就可以设计为
+
+
+$$ MSE(v(x_t,t) , x_1 - x_0 )$$
+
+其中v就表示神经网络用 $x_t$ 和 $t$ 预测出来的"x此时的加速度"，也可以称之为流场， 也可以称之为x(t) 的导数 
+
+
+
+
+### Fun Facts(我猜的)
+
+* ODE 是确定过程，因此其整个过程都不需要概率建模，但是SDE就不一样，引入了随机量之后，每一个状态都变成了一个分布了, 需要大量概率建模，理解难度直线上升。
+* ODE，对于同样一个初始化噪声图，降噪出来的结果都一样，对于SDE，同一个噪声图最终会降噪出多样化的结果（这是RL所喜欢的东西）
+* 对于SDE，我们需要理解$p_t(x_t)$梯度方向的含义是什么，请看我的纸质笔记,在那个黄色的本子上！

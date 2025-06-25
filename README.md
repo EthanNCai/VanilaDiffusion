@@ -10,6 +10,8 @@
 * rectified flow matching-ODE推理代码
 * rectified flow matching-SDE推理代码
 
+ \* 没有特别说明的都是有条件生成
+
 
 ## 环境安装
 

@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import argparse
 import numpy as np
-from model_dit_cfg_xattention import SimpleDiTConditional
+from model_dit import SimpleDiTConditional
 from noise_scheduler import NoiseScheduler
 from PIL import Image
 
